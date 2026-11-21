@@ -5,7 +5,7 @@ Serves the scenes and control panel, and keeps the bracket's live state (players
 in a JSON file so the control panel can change what the scenes show while they're on air.
 
 Locally:
-    python3 server.py                  # http://localhost:8000, no password needed (this computer only)
+    python3 server.py                  # http://localhost:7999, no password needed (this computer only)
     python3 server.py --port 9000
 
 Hosted (see docker-compose.yml): set a password and listen on all addresses, behind an HTTPS reverse proxy.
@@ -13,7 +13,7 @@ Hosted (see docker-compose.yml): set a password and listen on all addresses, beh
 
 Settings (command line flag, or environment variable if the flag isn't given):
     --host / HOST                 address to listen on (default 127.0.0.1)
-    --port / PORT                 port (default 8000)
+    --port / PORT                 port (default 7999)
     --state-file / STATE_FILE     where state is saved (default ./state.json)
     CONTROL_PASSWORD              password required to change anything. Reading is always public, since it's on stream.
                                   Required whenever the server listens on anything other than this computer.
@@ -199,7 +199,7 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "7999")))
     parser.add_argument("--state-file", default=os.environ.get("STATE_FILE", os.path.join(ROOT, "state.json")))
     args = parser.parse_args()
 

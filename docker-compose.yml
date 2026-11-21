@@ -13,7 +13,7 @@ services:
       CONTROL_PASSWORD: ${CONTROL_PASSWORD:?Set CONTROL_PASSWORD in .env (copy .env.example)}
     ports:
       # Only reachable from the VPS itself, so Caddy is the only way in. Change the first number to use another port.
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:7999:7999"
     volumes:
       - overlay-data:/data
 
