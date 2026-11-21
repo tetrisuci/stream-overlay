@@ -1,0 +1,18 @@
+# Secrets: the control panel password for the hosted server
+.env
+
+# Live bracket and current-match state, written by server.py (it's data, not code)
+state.json
+.state-*.tmp
+
+# macOS
+.DS_Store
+
+# Editor / tool folders
+.claude/
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc

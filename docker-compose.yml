@@ -1,0 +1,21 @@
+# Runs the overlay server. Put Caddy (or any HTTPS reverse proxy) in front of it; see README.md.
+#
+#   cp .env.example .env     # then set CONTROL_PASSWORD
+#   docker compose up -d --build
+#
+# Bracket state is kept in the "overlay-data" volume, so it survives restarts and rebuilds.
+services:
+  overlay:
+    build: .
+    restart: unless-stopped
+    environment:
+      # The server refuses to start without this, since it listens on all addresses inside the container.
+      CONTROL_PASSWORD: ${CONTROL_PASSWORD:?Set CONTROL_PASSWORD in .env (copy .env.example)}
+    ports:
+      # Only reachable from the VPS itself, so Caddy is the only way in. Change the first number to use another port.
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - overlay-data:/data
+
+volumes:
+  overlay-data:

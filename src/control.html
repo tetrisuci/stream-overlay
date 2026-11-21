@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cascade Clash · Control Panel</title>
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    /* This is an operator page, not a stream scene: it scrolls and has a solid background. */
+    html, body { height: auto; min-height: 100%; overflow: auto; background: #0e1427; }
+    body { font-family: var(--font-display); font-size: 16px; }
+    h1, h2, h3 { margin: 0; font-weight: 700; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 24px;
+      background: var(--panel);
+      border-bottom: var(--outline-width) solid var(--outline);
+    }
+    .topbar h1 { font-size: 22px; letter-spacing: 2px; text-transform: uppercase; }
+    .status { margin-left: auto; padding: 4px 12px; background: var(--outline); font-size: 14px; letter-spacing: 1px; }
+    .status.is-ok { color: #9be7b0; }
+    .status.is-saving { color: #ffe08a; }
+    .status.is-error { color: #ff9b9b; }
+
+    .unlock { margin: 24px; padding: 16px 20px; max-width: 420px; background: #18203d; border: 3px solid var(--outline); display: grid; gap: 10px; }
+    .unlock h2 { font-size: 15px; letter-spacing: 2px; text-transform: uppercase; color: #aab7e6; }
+    .unlock[hidden] { display: none; }
+    .topbar button { padding: 3px 10px; font-size: 12px; }
+    .notice { margin: 16px 24px 0; padding: 12px 16px; background: #4a2a2a; border: 3px solid var(--outline); line-height: 1.5; }
+    .notice code { background: var(--outline); padding: 2px 6px; font-size: 14px; }
+
+    .layout { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 24px; padding: 24px; align-items: start; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .side { display: grid; gap: 16px; position: sticky; top: 72px; }
+    @media (max-width: 900px) { .side { position: static; } }
+
+    .card { background: #18203d; border: 3px solid var(--outline); padding: 14px 16px; display: grid; gap: 10px; }
+    .card h2 { font-size: 15px; letter-spacing: 2px; text-transform: uppercase; color: #aab7e6; }
+    label.field { display: grid; gap: 4px; font-size: 13px; color: #aab7e6; letter-spacing: 1px; text-transform: uppercase; }
+    input[type="text"], input[type="number"], textarea, select {
+      font: inherit;
+      font-size: 16px;
+      color: var(--paper);
+      background: var(--outline);
+      border: 2px solid #2a3560;
+      padding: 8px 10px;
+      width: 100%;
+    }
+    input:focus, textarea:focus, select:focus, button:focus-visible { outline: 3px solid #8fb0ff; outline-offset: 0; }
+    textarea { min-height: 190px; resize: vertical; line-height: 1.5; }
+    .hint { font-size: 13px; color: #8d99c4; line-height: 1.4; }
+    .hint.is-warning { color: #ffb3b3; }
+    button {
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--paper);
+      background: var(--panel);
+      border: 3px solid var(--outline);
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { filter: brightness(1.15); }
+    button:disabled { opacity: 0.45; cursor: default; }
+    button.danger { background: #8a3a3a; }
+
+    .player-fields { display: grid; gap: 10px; }
+    .pf { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pf-title { grid-column: 1 / -1; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #aab7e6; }
+    .button-row { display: flex; gap: 8px; }
+    .button-row .primary { flex: 1; background: #3f8a5a; }
+    .preview-frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border: 2px solid var(--outline); }
+    .preview-frame iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; }
+
+    .matches { display: grid; gap: 28px; }
+    .group > h2 { font-size: 22px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 3px solid var(--panel); }
+    .round { margin-bottom: 16px; }
+    .round > h3 { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #aab7e6; margin-bottom: 8px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+    .match-card { background: var(--panel); border: 3px solid var(--outline); display: grid; }
+    .match-card.is-waiting { background: #2a3766; }
+    .match-head { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--outline); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+    .match-state { margin-left: auto; color: #aab7e6; }
+    .match-card.is-final .match-state { color: #9be7b0; }
+    .match-card.is-live .match-state { color: #ffe08a; }
+    .match-head button { padding: 1px 8px; font-size: 11px; border-width: 2px; background: #2a3560; }
+    .row { display: flex; align-items: stretch; min-height: 44px; border-top: 2px solid var(--outline); }
+    .row:first-of-type { border-top: 0; }
+    .row-name { flex: 1; min-width: 0; padding: 0 12px; display: flex; align-items: center; font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row.is-tbd .row-name { color: rgba(255, 255, 255, 0.55); font-size: 14px; font-weight: 500; }
+    .row.is-loser .row-name { opacity: 0.55; }
+    .row.is-winner input.score-input { background: var(--paper); color: var(--outline); }
+    .row input.score-input { width: 64px; flex: none; border: 0; border-left: 2px solid var(--outline); text-align: center; font-size: 22px; font-weight: 700; padding: 0; }
+    .row input.score-input:disabled { opacity: 0.35; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Bracket control</h1>
+    <span class="status" id="status" role="status">Connecting…</span>
+    <button id="lockButton" type="button" hidden>Lock</button>
+  </header>
+  <form class="unlock" id="unlock" hidden>
+    <h2>Password needed</h2>
+    <div class="hint" id="unlockHint">Enter the control password to change the bracket.</div>
+    <input type="password" id="password" autocomplete="current-password" aria-label="Control password">
+    <button type="submit">Unlock</button>
+  </form>
+  <div class="notice" id="offline" hidden>
+    Not connected to the overlay server, so changes can't be saved or reach the scene. Start it from the project folder with
+    <code>python3 server.py</code> and open this page at <code>http://localhost:8000/control.html</code>.
+  </div>
+
+  <div class="layout" id="layout">
+    <section class="side">
+      <div class="card">
+        <h2>Current match</h2>
+        <label class="field">Fill from a bracket match
+          <select id="fillMatch"><option value="">Choose a match…</option></select>
+        </label>
+        <div class="player-fields">
+          <div class="pf">
+            <span class="pf-title">Player 1 (left)</span>
+            <input type="text" id="p1Name" list="bracketPlayers" placeholder="Name" maxlength="64" autocomplete="off" aria-label="Player 1 name">
+            <input type="text" id="p1Pronouns" placeholder="Pronouns" maxlength="32" autocomplete="off" aria-label="Player 1 pronouns">
+          </div>
+          <div class="pf">
+            <span class="pf-title">Player 2 (right)</span>
+            <input type="text" id="p2Name" list="bracketPlayers" placeholder="Name" maxlength="64" autocomplete="off" aria-label="Player 2 name">
+            <input type="text" id="p2Pronouns" placeholder="Pronouns" maxlength="32" autocomplete="off" aria-label="Player 2 pronouns">
+          </div>
+        </div>
+        <datalist id="bracketPlayers"></datalist>
+        <div class="button-row">
+          <button id="swapPlayers" type="button">Swap</button>
+          <button id="applyCurrent" class="primary" type="button" disabled>Publish</button>
+        </div>
+        <div class="hint" id="onStream"></div>
+      </div>
+
+      <div class="card">
+        <h2>Event</h2>
+        <label class="field">Title (shown in the scene header)
+          <input type="text" id="title" maxlength="80" autocomplete="off">
+        </label>
+        <label class="field">Score to win a match
+          <input type="number" id="firstTo" min="1" max="99" placeholder="Blank: higher score wins">
+        </label>
+      </div>
+
+      <div class="card">
+        <h2>Players</h2>
+        <label class="field">One name per line, seed 1 first
+          <textarea id="players" spellcheck="false"></textarea>
+        </label>
+        <div class="hint" id="playersHint"></div>
+        <button id="applyPlayers" type="button" disabled>Update bracket</button>
+      </div>
+
+      <div class="card">
+        <h2>Live preview</h2>
+        <div class="preview-frame" id="previewFrame"><iframe src="bracket.html?preview=1" title="Bracket scene preview"></iframe></div>
+      </div>
+
+      <div class="card">
+        <h2>Reset</h2>
+        <button id="resetScores" class="danger" type="button">Clear all scores</button>
+      </div>
+    </section>
+
+    <section class="matches" id="matches" aria-label="Matches"></section>
+  </div>
+
+  <script src="state.js"></script>
+  <script src="bracket.js"></script>
+  <script>
+    let state = normalizeState(DEFAULT_STATE);
+    let bracket = buildBracket(state.players.length);
+    let connected = false;
+    let authRequired = false;
+
+    const $ = (id) => document.getElementById(id);
+    const make = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+
+    // ------------------------------------------------------------ saving
+
+    function setStatus(kind, text) {
+      const status = $("status");
+      status.className = `status is-${kind}`;
+      status.textContent = text;
+    }
+
+    let saveTimer = null;
+    function queueSave() {
+      setStatus("saving", "Saving…");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        const result = await saveState(state);
+        if (result === 401) {
+          lock("The saved password was rejected. Enter it again.");
+          return;
+        }
+        const ok = result >= 200 && result < 300;
+        connected = result !== 0;
+        $("offline").hidden = connected;
+        setStatus(ok ? "ok" : "error", ok ? `Saved ${new Date().toLocaleTimeString()}` : "Not saved");
+      }, 250);
+    }
+
+    // ------------------------------------------------------------ matches
+
+    function roundName(match, lbColumn) {
+      if (match.bracket === "W") return match.round === bracket.k ? "Winners Final" : `Winners Round ${match.round}`;
+      if (match.bracket === "L") return match.round === bracket.lbRounds ? "Losers Final" : `Losers Round ${lbColumn}`;
+      return match.id === "GF1" ? "Grand Final" : "Bracket Reset";
+    }
+
+    function scoreValue(value) {
+      const n = Math.floor(Number(value));
+      return Number.isFinite(n) ? Math.min(Math.max(n, 0), 99) : 0;
+    }
+
+    function matchCard(match, s) {
+      const card = make("div", "match-card");
+      card.dataset.match = match.id;
+      const ready = s.a.kind === "player" && s.b.kind === "player";
+      const entered = state.results[match.id];
+      const decided = s.winner.kind === "player";
+      card.classList.add(decided ? "is-final" : entered ? "is-live" : "is-waiting");
+
+      const head = make("div", "match-head");
+      head.append(make("span", "match-id", match.id), make("span", "match-state", decided ? "Final" : entered ? "Live" : ready ? "Ready" : "Waiting"));
+      if (entered) {
+        const clear = make("button", "", "Clear");
+        clear.type = "button";
+        clear.addEventListener("click", () => { delete state.results[match.id]; update(); });
+        head.append(clear);
+      }
+      card.append(head);
+
+      [[s.a, 0], [s.b, 1]].forEach(([player, row]) => {
+        const line = make("label", "row");
+        if (player.kind === "tbd") line.classList.add("is-tbd");
+        if (s.winner === player) line.classList.add("is-winner");
+        else if (s.loser === player && decided) line.classList.add("is-loser");
+        const input = make("input", "score-input");
+        input.type = "number";
+        input.min = "0";
+        input.max = "99";
+        input.inputMode = "numeric";
+        input.disabled = !ready;
+        input.value = entered ? entered[row] : "";
+        input.dataset.key = `${match.id}:${row}`;
+        input.setAttribute("aria-label", `${match.id} score for ${player.kind === "player" ? player.name : "waiting slot"}`);
+        input.addEventListener("input", () => {
+          const [a, b] = card.querySelectorAll("input");
+          if (a.value === "" && b.value === "") delete state.results[match.id];
+          else state.results[match.id] = [scoreValue(a.value), scoreValue(b.value)];
+          update();
+        });
+        line.append(make("span", "row-name", player.kind === "player" ? player.name : player.label), input);
+        card.append(line);
+      });
+      return card;
+    }
+
+    function renderMatches() {
+      const focusKey = document.activeElement?.dataset?.key;
+      const { state: matchState } = evaluateBracket(bracket, state.players, state.results, state.firstTo);
+      const shown = bracket.matches.filter((m) => !matchState[m.id].bye && !matchState[m.id].inactive);
+
+      const groups = [["W", "Winners bracket"], ["L", "Losers bracket"], ["G", "Grand final"]];
+      const host = $("matches");
+      host.replaceChildren();
+      for (const [key, title] of groups) {
+        const inGroup = shown.filter((m) => m.bracket === key);
+        if (!inGroup.length) continue;
+        const group = make("div", "group");
+        group.append(make("h2", "", title));
+        const roundKey = (m) => (m.bracket === "G" ? m.id : m.round);
+        const rounds = [...new Set(inGroup.map(roundKey))];
+        rounds.forEach((round, index) => {
+          const matches = inGroup.filter((m) => roundKey(m) === round);
+          const section = make("div", "round");
+          section.append(make("h3", "", roundName(matches[0], index + 1)));
+          const cards = make("div", "cards");
+          matches.forEach((m) => cards.append(matchCard(m, matchState[m.id])));
+          section.append(cards);
+          group.append(section);
+        });
+        host.append(group);
+      }
+      if (focusKey) document.querySelector(`[data-key="${focusKey}"]`)?.focus();
+      refreshFillOptions(shown, matchState);
+    }
+
+    // ------------------------------------------------------------ current match (names + pronouns on the main overlay)
+
+    const sides = ["p1", "p2"];
+    const nameField = (side) => $(`${side}Name`);
+    const pronounsField = (side) => $(`${side}Pronouns`);
+    const formCurrent = () => Object.fromEntries(sides.map((side) => [side, {
+      name: nameField(side).value.trim(),
+      pronouns: pronounsField(side).value.trim(),
+    }]));
+    const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+    const rememberedKey = (name) => Object.keys(state.pronounsByName).find((key) => sameName(key, name));
+    const rememberedPronouns = (name) => state.pronounsByName[rememberedKey(name)] ?? "";
+
+    function refreshCurrent() {
+      const now = state.current;
+      $("applyCurrent").disabled = JSON.stringify(formCurrent()) === JSON.stringify(now);
+      const label = (side) => (now[side].name ? `${now[side].name}${now[side].pronouns ? ` (${now[side].pronouns})` : ""}` : "nobody");
+      $("onStream").textContent = `On stream: ${label("p1")} vs ${label("p2")}`;
+    }
+
+    function refreshPlayerList() {
+      $("bracketPlayers").replaceChildren(...state.players.map((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        return option;
+      }));
+    }
+
+    function refreshFillOptions(shown, matchState) {
+      const select = $("fillMatch");
+      const open = shown.filter((m) => {
+        const s = matchState[m.id];
+        return s.a.kind === "player" && s.b.kind === "player" && s.winner.kind !== "player";
+      });
+      select.replaceChildren(...[["", open.length ? "Choose a match…" : "No matches ready"], ...open.map((m) => {
+        const s = matchState[m.id];
+        return [m.id, `${m.id} · ${s.a.name} vs ${s.b.name}`];
+      })].map(([value, text]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        return option;
+      }));
+    }
+
+    sides.forEach((side) => {
+      nameField(side).addEventListener("input", refreshCurrent);
+      pronounsField(side).addEventListener("input", refreshCurrent);
+      // A different name means a different person: use the pronouns remembered for them (or none).
+      nameField(side).addEventListener("change", () => {
+        pronounsField(side).value = rememberedPronouns(nameField(side).value.trim());
+        refreshCurrent();
+      });
+      [nameField(side), pronounsField(side)].forEach((field) => field.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !$("applyCurrent").disabled) $("applyCurrent").click();
+      }));
+    });
+
+    $("fillMatch").addEventListener("change", () => {
+      const id = $("fillMatch").value;
+      if (!id) return;
+      const { state: matchState } = evaluateBracket(bracket, state.players, state.results, state.firstTo);
+      const s = matchState[id];
+      [[sides[0], s.a], [sides[1], s.b]].forEach(([side, player]) => {
+        nameField(side).value = player.name;
+        pronounsField(side).value = rememberedPronouns(player.name);
+      });
+      $("fillMatch").value = "";
+      refreshCurrent();
+    });
+
+    $("swapPlayers").addEventListener("click", () => {
+      [nameField("p1").value, nameField("p2").value] = [nameField("p2").value, nameField("p1").value];
+      [pronounsField("p1").value, pronounsField("p2").value] = [pronounsField("p2").value, pronounsField("p1").value];
+      refreshCurrent();
+    });
+
+    $("applyCurrent").addEventListener("click", () => {
+      state.current = formCurrent();
+      // Remember each player's pronouns (or forget them if cleared) for next time.
+      sides.forEach((side) => {
+        const { name, pronouns } = state.current[side];
+        if (!name) return;
+        delete state.pronounsByName[rememberedKey(name)];
+        if (pronouns) state.pronounsByName[name] = pronouns;
+      });
+      refreshCurrent();
+      queueSave();
+    });
+
+    // ------------------------------------------------------------ players + event settings
+
+    const parsePlayers = () => $("players").value.split("\n").map((n) => n.trim()).filter(Boolean);
+
+    function refreshPlayersHint() {
+      const names = parsePlayers();
+      const hint = $("playersHint");
+      const same = JSON.stringify(names) === JSON.stringify(state.players);
+      const tooFew = names.length < 2;
+      hint.classList.toggle("is-warning", tooFew);
+      if (tooFew) hint.textContent = "Need at least 2 players.";
+      else {
+        const size = 2 ** Math.ceil(Math.log2(names.length));
+        hint.textContent = `${names.length} players, bracket of ${size}${size > names.length ? ` (${size - names.length} byes)` : ""}.`;
+      }
+      $("applyPlayers").disabled = tooFew || same;
+    }
+
+    $("players").addEventListener("input", refreshPlayersHint);
+    $("applyPlayers").addEventListener("click", () => {
+      const names = parsePlayers();
+      if (names.length !== state.players.length && Object.keys(state.results).length) {
+        if (!confirm("Changing the number of players changes the bracket and clears all scores. Continue?")) return;
+        state.results = {};
+      }
+      state.players = names;
+      bracket = buildBracket(names.length);
+      refreshPlayerList();
+      update();
+    });
+
+    $("title").addEventListener("input", () => { state.title = $("title").value; update(false); });
+    $("firstTo").addEventListener("input", () => {
+      const value = parseInt($("firstTo").value, 10);
+      state.firstTo = Number.isInteger(value) && value > 0 ? Math.min(value, 99) : null;
+      update();
+    });
+    $("resetScores").addEventListener("click", () => {
+      if (!Object.keys(state.results).length || confirm("Clear every score and restart the bracket?")) {
+        state.results = {};
+        update();
+      }
+    });
+
+    // ------------------------------------------------------------ password
+
+    // Until the password is accepted, the panel can be seen but not used.
+    function lock(message) {
+      clearTimeout(saveTimer);
+      $("layout").inert = true;
+      $("unlock").hidden = false;
+      $("unlockHint").textContent = message || "Enter the control password to change the bracket.";
+      $("password").value = "";
+      $("password").focus();
+      setStatus("error", "Locked");
+    }
+
+    $("unlock").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const password = $("password").value;
+      if (!password) return;
+      $("unlockHint").textContent = "Checking…";
+      if (await checkPassword(password)) {
+        setControlPassword(password);
+        $("layout").inert = false;
+        $("unlock").hidden = true;
+        setStatus("ok", "Unlocked");
+      } else {
+        $("unlockHint").textContent = "That password wasn't accepted.";
+        $("password").value = "";
+        $("password").focus();
+      }
+    });
+
+    $("lockButton").addEventListener("click", () => {
+      setControlPassword("");
+      lock("Locked. Enter the password to continue.");
+    });
+
+    // ------------------------------------------------------------ glue
+
+    function update(rerenderMatches = true) {
+      if (rerenderMatches) renderMatches();
+      refreshPlayersHint();
+      queueSave();
+    }
+
+    function fillForm() {
+      $("title").value = state.title;
+      $("firstTo").value = state.firstTo ?? "";
+      $("players").value = state.players.join("\n");
+      sides.forEach((side) => {
+        nameField(side).value = state.current[side].name;
+        pronounsField(side).value = state.current[side].pronouns;
+      });
+      refreshPlayerList();
+    }
+
+    // Keep the live preview at 1920x1080 and scale it to the panel width.
+    const frame = $("previewFrame");
+    const fitPreview = () => { frame.firstElementChild.style.transform = `scale(${frame.clientWidth / 1920})`; };
+    new ResizeObserver(fitPreview).observe(frame);
+    fitPreview();
+
+    (async function start() {
+      let saved = null;
+      try {
+        const session = await (await fetch("api/session", { cache: "no-store" })).json();
+        authRequired = !!session.authRequired;
+      } catch {
+        authRequired = false;
+      }
+      try {
+        const response = await fetch("api/state", { cache: "no-store" });
+        connected = response.ok; // 204 = server is up, nothing saved yet
+        if (response.status === 200) saved = normalizeState(await response.json());
+      } catch {
+        connected = false;
+      }
+      if (saved) state = saved;
+      bracket = buildBracket(Math.max(state.players.length, 2));
+      fillForm();
+      renderMatches();
+      refreshPlayersHint();
+      refreshCurrent();
+      $("offline").hidden = connected;
+      setStatus(connected ? "ok" : "error", connected ? (saved ? "Loaded saved state" : "Using the default bracket") : "Not connected");
+      if (authRequired) {
+        $("lockButton").hidden = false;
+        if (!(controlPassword() && (await checkPassword(controlPassword())))) lock("");
+      }
+    })();
+  </script>
+</body>
+</html>

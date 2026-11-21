@@ -1,0 +1,121 @@
+/* Shared look for every scene: fonts, colors, header clock/icon, footer logo panel and preview mode. */
+
+@font-face {
+  font-family: "DSEG7 Classic";
+  src: url("fonts/DSEG7Classic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fredoka";
+  src: url("fonts/Fredoka.ttf") format("truetype");
+  font-weight: 300 700; /* variable font */
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  --outline: #0d1222; /* borders and outlines */
+  --panel: #4560ab;   /* body color of the panels */
+  --outline-width: 4px;
+  --paper: #fff;
+  --font-display: "Fredoka", "Arial Rounded MT Bold", Arial, sans-serif;
+  --bar-height: 90px;
+  --header-logo-margin: 6px; /* gap above and below the header icon; it sits 3x this from the right edge */
+  --logo-panel-width: 400px;
+  --logo-panel-height: 160px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+body { color: var(--paper); font-family: Arial, Helvetica, sans-serif; }
+
+/* Fixed broadcast coordinates. Preview mode alone scales the whole stage. */
+.overlay { position: relative; width: 1920px; height: 1080px; transform-origin: top left; }
+
+/* Clock at the left end of the header. Its height defines the header height. */
+.system-clock {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  padding: 12px 18px;
+  /* Transparent: reserves the space of the header's bottom border so the bar height matches the clock. */
+  border-bottom: var(--outline-width) solid transparent;
+}
+.system-clock-time { display: block; }
+.system-clock-digits {
+  display: flex;
+  align-items: center;
+  height: 46px;
+  font-family: "DSEG7 Classic", monospace;
+  font-size: 32px;
+  font-weight: 400;
+  font-style: normal;
+  white-space: nowrap;
+  position: relative;
+  isolation: isolate;
+}
+/* Dim "88:88:88" behind the real time so unlit segments show as ghosts, like an LCD. */
+.system-clock-digits::before {
+  content: "88:88:88";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.14);
+}
+
+/* Icon at the right end of the header, sized to the bar (--header-height is set by stage.js / the scene). */
+.tetris-logo {
+  position: absolute;
+  top: var(--header-logo-margin);
+  right: calc(var(--header-logo-margin) * 3);
+  display: block;
+  width: calc(var(--header-height, 74px) - var(--outline-width) - var(--header-logo-margin) * 2);
+  height: calc(var(--header-height, 74px) - var(--outline-width) - var(--header-logo-margin) * 2);
+  pointer-events: none;
+}
+
+.bottom-bar {
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--bar-height);
+  background: var(--panel);
+  border-top: var(--outline-width) solid var(--outline);
+  display: grid;
+  grid-template-columns: 1fr var(--logo-panel-width) 1fr;
+  align-items: center;
+}
+.brand { position: relative; height: 100%; }
+.logo-panel {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: var(--logo-panel-height);
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  border: var(--outline-width) solid var(--outline);
+  border-bottom: 0;
+}
+.event-logo { display: block; width: 340px; max-width: 90%; height: auto; }
+
+/* Optional browser preview (?preview=1); never enabled in the default OBS source. */
+body.preview {
+  background: #202024;
+  display: grid;
+  place-items: center;
+}
+.preview .overlay {
+  flex-shrink: 0;
+  background-color: #141416;
+  background-image: linear-gradient(45deg, #1b1b1e 25%, transparent 25%),
+    linear-gradient(-45deg, #1b1b1e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1b1b1e 75%),
+    linear-gradient(-45deg, transparent 75%, #1b1b1e 75%);
+  background-size: 40px 40px;
+  background-position: 0 0, 0 20px, 20px -20px, -20px 0;
+}

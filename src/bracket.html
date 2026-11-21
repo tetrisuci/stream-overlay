@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cascade Clash · Bracket Scene</title>
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    /* Header: same bar as the main overlay, with the scene title in the middle. */
+    .header-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1920px;
+      height: var(--header-height, 74px);
+      background: var(--panel);
+      border-bottom: var(--outline-width) solid var(--outline);
+      display: grid;
+      place-items: center;
+      font-family: var(--font-display);
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .header-title { padding-bottom: 2px; }
+
+    /* The crowd camera shows through the transparent page in OBS; this only labels it in preview. */
+    .preview .crowd-cam {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #8d8d95;
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .bracket { position: absolute; transform-origin: top left; }
+    .bracket-lines { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+    .bracket-line-halo { fill: none; stroke: var(--outline); stroke-width: 9; stroke-linejoin: miter; }
+    .bracket-line { fill: none; stroke: var(--paper); stroke-width: 3; stroke-linejoin: miter; }
+
+    .round-label {
+      position: absolute;
+      height: 22px;
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      /* Outlined text so it stays readable over the crowd camera. */
+      -webkit-text-stroke: 5px var(--outline);
+      paint-order: stroke fill;
+    }
+
+    .match, .champion {
+      position: absolute;
+      width: 232px;
+      height: 68px;
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border: 3px solid var(--outline);
+    }
+    .slot { display: flex; height: 30px; min-width: 0; }
+    .slot + .slot { border-top: 2px solid var(--outline); }
+    .name {
+      flex: 1;
+      min-width: 0;
+      padding: 0 10px;
+      display: block;
+      line-height: 30px;
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .score {
+      width: 40px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      background: var(--outline);
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .slot.is-tbd .name { color: rgba(255, 255, 255, 0.62); font-size: 14px; font-weight: 500; letter-spacing: 0.5px; }
+    .slot.is-loser .name, .slot.is-loser .score { opacity: 0.5; }
+    .slot.is-winner .score { background: var(--paper); color: var(--outline); }
+
+    .champion { justify-content: center; align-items: center; text-align: center; }
+    .champion-title { font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; opacity: 0.75; font-family: var(--font-display); }
+    .champion-name { font-family: var(--font-display); font-size: 22px; font-weight: 700; max-width: 100%; padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
+</head>
+<body>
+  <main class="overlay" aria-label="Bracket scene">
+    <div class="crowd-cam" aria-hidden="true">Crowd camera</div>
+    <div class="header-bar"><span class="header-title" id="title"></span></div>
+    <img class="tetris-logo" src="assets/tetris@uci_logo.png" width="2048" height="2048" alt="Tetris at UCI">
+    <div class="system-clock">
+      <time class="system-clock-time" id="system-clock-time" aria-label="System time">
+        <span class="system-clock-digits"></span>
+      </time>
+    </div>
+    <div class="bracket" id="bracket" aria-label="Double elimination bracket"></div>
+    <footer class="bottom-bar">
+      <div></div>
+      <div class="brand">
+        <div class="logo-panel">
+          <img class="event-logo" src="assets/cascade_clash_logo.png" width="811" height="319" alt="Cascade Clash">
+        </div>
+      </div>
+      <div></div>
+    </footer>
+  </main>
+  <script src="stage.js"></script>
+  <script src="state.js"></script>
+  <script src="bracket.js"></script>
+  <script>
+    // Players, scores and the title come from the control panel (control.html) when server.py is running.
+    // Without the server this page shows DEFAULT_STATE from bracket.js.
+    //
+    // URL overrides, handy for testing sizes (they switch off live updates):
+    //   ?players=Ann,Bob,Cy       custom players, in seed order
+    //   ?n=11                     generate 11 placeholder players
+    //   ?sim=0.6                  simulate results for the first 60% of matches
+    //   ?results={"W1-1":[2,0]}   scores as JSON
+    //   ?firstTo=3                score that wins a match
+    //   ?title=Text               header title
+    const overrideKeys = ["players", "n", "sim", "results", "firstTo", "title"];
+    const hasOverrides = overrideKeys.some((key) => params.has(key));
+
+    function withOverrides(state) {
+      const next = { ...state };
+      if (params.get("players")) next.players = params.get("players").split(",").map((n) => n.trim()).filter(Boolean);
+      if (params.get("n")) next.players = Array.from({ length: Number(params.get("n")) }, (_, i) => `PLAYER ${i + 1}`);
+      if (params.has("firstTo")) next.firstTo = Number(params.get("firstTo")) || null;
+      if (params.has("title")) next.title = params.get("title");
+      if (params.get("results")) next.results = JSON.parse(params.get("results"));
+      if (params.has("sim")) {
+        const bracket = buildBracket(next.players.length);
+        next.results = simulateResults(bracket, next.players, Number(params.get("sim")), next.firstTo || 2);
+      }
+      return next;
+    }
+
+    startClock();
+    const headerHeight = publishHeaderHeight();
+    startPreview();
+
+    // Draw the bracket, scaled to fit the space between the header and the footer logo.
+    let lastDrawn = "";
+    function show(state) {
+      const key = JSON.stringify(state);
+      if (key === lastDrawn) return;
+      lastDrawn = key;
+      document.getElementById("title").textContent = state.title;
+      const bracket = buildBracket(Math.max(state.players.length, 2));
+      const evaluation = evaluateBracket(bracket, state.players, state.results, state.firstTo);
+      const host = document.getElementById("bracket");
+      const { width, height } = renderBracket(host, bracket, evaluation);
+      const area = { x: 40, y: headerHeight + 24, w: 1840, h: 905 - (headerHeight + 24) };
+      const scale = Math.min(area.w / width, area.h / height, 1);
+      host.style.transform = `scale(${scale})`;
+      host.style.left = `${area.x + (area.w - width * scale) / 2}px`;
+      host.style.top = `${area.y + (area.h - height * scale) / 2}px`;
+    }
+
+    async function start() {
+      await document.fonts.load('700 18px "Fredoka"').catch(() => {});
+      await document.fonts.ready;
+      const saved = await fetchSavedState();
+      show(hasOverrides ? withOverrides(saved ?? normalizeState(DEFAULT_STATE)) : saved ?? normalizeState(DEFAULT_STATE));
+      if (hasOverrides) return;
+      // Pick up changes from the control panel.
+      setInterval(async () => {
+        const latest = await fetchSavedState();
+        if (latest) show(latest);
+      }, 1000);
+    }
+    start();
+  </script>
+</body>
+</html>
