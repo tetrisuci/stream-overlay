@@ -19,6 +19,20 @@ function seedOrder(size) {
   return order;
 }
 
+// Which winners-bracket match's loser drops into losers match `i` of drop-in round `drop` (1 = losers
+// of winners round 2), when that round has `n` matches. Challonge cycles through four orders:
+// reversed, each half reversed, halves swapped, unchanged, then repeats. Checked against Challonge's
+// own 16, 32, 64 and 128 player brackets; brackets with byes use the same layout with bye matches hidden.
+function dropOrder(drop, n, i) {
+  const h = n / 2;
+  switch ((drop - 1) % 4) {
+    case 0: return n - 1 - i;
+    case 1: return n < 2 ? i : Math.floor(i / h) * h + (h - 1 - (i % h));
+    case 2: return n < 2 ? i : (i + h) % n;
+    default: return i;
+  }
+}
+
 function buildBracket(count) {
   const size = Math.max(2, 2 ** Math.ceil(Math.log2(Math.max(count, 2))));
   const k = Math.log2(size); // winners bracket rounds
@@ -43,6 +57,7 @@ function buildBracket(count) {
   }
 
   // Losers bracket: odd rounds pair up survivors, even rounds bring in the losers of winners round (t/2 + 1).
+  // Dropping players are shuffled the same way Challonge does it, to keep rematches apart. See dropOrder.
   const lbRounds = k >= 2 ? 2 * (k - 1) : 0;
   for (let t = 1; t <= lbRounds; t++) {
     const j = Math.ceil(t / 2);
@@ -53,7 +68,7 @@ function buildBracket(count) {
         b = loser(id("W", 1, 2 * i + 1));
       } else if (t % 2 === 0) {
         a = winner(id("L", t - 1, i));
-        b = loser(id("W", j + 1, i));
+        b = loser(id("W", j + 1, dropOrder(j, size / 2 ** (j + 1), i)));
       } else {
         a = winner(id("L", t - 1, 2 * i));
         b = winner(id("L", t - 1, 2 * i + 1));
